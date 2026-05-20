@@ -6,6 +6,13 @@ Zinnen worden ingeladen vanuit `js/sentences.js`, gegenereerd vanuit de *En acti
 
 ---
 
+## Publieke versie 
+
+De app is beschikbaar via : [https://parler.geertvandeweyer.be](https://parler.geertvandeweyer.be)
+
+
+---
+
 ## Wat doet de app?
 
 - **Uitspraakfeedback per woord** — correct (groen) / bijna goed (oranje) / gemist (rood), via Levenshtein-vergelijking met globale sequentie-uitlijning (Needleman-Wunsch).
