@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Frans Uitspraak</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ══ SETUP SCREEN (model selection + first load) ══════════════════════════ -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <h1>🎙️ Frans Uitspraak</h1>
+    <p class="setup-subtitle">
+      Lees een Franse zin luidop voor.<br>
+      De app luistert en geeft per woord feedback op je uitspraak.
+    </p>
+
+    <div class="model-options" role="radiogroup" aria-label="Whisper model keuze">
+      <label class="model-option">
+        <input type="radio" name="model" value="Xenova/whisper-tiny" checked>
+        <div class="model-info">
+          <strong>whisper-tiny</strong><span class="rec-badge">Aanbevolen</span>
+          <span>~150 MB · Snel (2–4 s) · Basisnauwkeurigheid</span>
+        </div>
+      </label>
+      <label class="model-option">
+        <input type="radio" name="model" value="Xenova/whisper-small">
+        <div class="model-info">
+          <strong>whisper-small</strong><span class="rec-badge">Aanbevolen</span>
+          <span>~460 MB · Iets trager · Hogere nauwkeurigheid</span>
+        </div>
+      </label>
+    </div>
+
+    <div id="gpu-rec" class="gpu-rec" hidden></div>
+
+    <p class="setup-note">
+      Het model wordt bij het eerste gebruik gedownload en daarna gecached in je browser.
+      Vereist Chrome 113+, Edge 113+ of een andere moderne browser.
+    </p>
+
+    <!-- WebGPU / browser capability banner -->
+    <div id="webgpu-banner" class="webgpu-banner" hidden>
+      <span id="webgpu-msg"></span>
+    </div>
+
+    <button id="load-model-btn" class="btn-primary">Model laden</button>
+
+    <div id="model-progress" hidden>
+      <div class="progress-track">
+        <div id="progress-fill" class="progress-fill"></div>
+      </div>
+      <p id="progress-text" class="progress-text">Bezig met downloaden…</p>
+      <ul id="file-list" class="file-list"></ul>
+    </div>
+
+    <div class="setup-footer">
+      <button class="disc-btn" data-modal="data">ℹ️ Gegevens</button>
+      <button class="disc-btn" data-modal="auteur">✉️ Auteur</button>
+      <button class="disc-btn" data-modal="licentie">📄 Licentie</button>
+      <a class="disc-btn" href="https://github.com/geertvandeweyer/frans_uitspraak" target="_blank" rel="noopener">⌨️ GitHub</a>
+      <button class="disc-btn" data-modal="koffie">☕ Support</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ APP SCREEN (shown after model loads) ══════════════════════════════════ -->
+<div id="app-screen" hidden>
+
+  <header>
+    <h1>🎙️ Frans Uitspraak</h1>
+    <div class="header-right">
+      <span id="streak-count"   class="stat-pill"></span>
+      <span id="practiced-count" class="stat-pill"></span>
+      <button id="settings-btn" class="btn-icon" title="Instellingen" aria-label="Instellingen">⚙️</button>
+    </div>
+  </header>
+
+  <!-- Settings panel (toggle via gear icon) -->
+  <div id="settings-panel" class="settings-panel" hidden>
+    <label>
+      Drempel slagen:
+      <input type="number" id="threshold-input" min="0" max="100" step="5" value="80">
+      <span>%</span>
+    </label>
+    <label>
+      🏎️ TTS snelheid:
+      <select id="tts-rate">
+        <option value="0.5">0.5× (Traag)</option>
+        <option value="0.75" selected>0.75×</option>
+        <option value="1.0">1.0× (Normaal)</option>
+        <option value="1.25">1.25× (Snel)</option>
+      </select>
+    </label>
+    <label>
+      🖥️ GPU gebruik:
+      <select id="gpu-pref-settings">
+        <option value="high-performance">WebGPU — Hoog vermogen</option>
+        <option value="auto">WebGPU — Automatisch</option>
+        <option value="low-power">WebGPU — Zuinig</option>
+        <option value="wasm">WASM (CPU)</option>
+      </select>
+    </label>
+    <button id="change-model-btn" class="btn-secondary">Model wisselen</button>
+  </div>
+
+  <main>
+    <!-- Sentence display -->
+    <div class="sentence-card" aria-live="polite">
+      <p id="sentence-display" class="sentence-text"></p>
+    </div>
+    <p id="sentence-meta" class="sentence-meta"></p>
+
+    <!-- Primary controls -->
+    <div class="controls">
+      <button id="listen-btn" class="btn-listen">▶ Luister</button>
+      <button id="speak-btn"  class="mic-btn">🎤 Spreek</button>
+      <button id="skip-btn"   class="btn-skip" hidden>Sla over</button>
+    </div>
+
+    <!-- Volume meter (shown during recording) -->
+    <div id="vol-bar-wrap" class="vol-bar-wrap" hidden>
+      <span class="vol-label">🎤</span>
+      <div class="vol-bar-track">
+        <div id="vol-bar-inner" class="vol-bar-inner"></div>
+      </div>
+      <span id="vol-warning" class="vol-warning" hidden>Te stil</span>
+    </div>
+
+    <!-- Processing indicator (outside feedback-area so it shows while feedbackArea is hidden) -->
+    <div id="processing-indicator" class="processing-indicator" hidden>
+      <div class="proc-row">
+        <div class="spinner"></div>
+        <span>Uitspraak analyseren…</span>
+        <span id="proc-timer" class="proc-timer"></span>
+      </div>
+      <div class="proc-progress-track">
+        <div id="proc-progress-fill" class="proc-progress-fill"></div>
+      </div>
+    </div>
+
+    <!-- Feedback area (shown after transcription) -->
+    <div id="feedback-area" hidden>
+
+      <!-- Word-level colored chips -->
+      <div id="word-feedback" class="feedback-words" aria-live="polite"></div>
+
+      <!-- Score + transcript -->
+      <div id="score-row" class="score-row"></div>
+
+      <!-- Fluency info -->
+      <div id="fluency-row" class="fluency-row" hidden></div>
+
+      <!-- Action buttons -->
+      <div id="action-buttons" class="action-buttons" hidden>
+        <button id="replay-btn" class="btn-replay">🔊 Herhaal</button>
+        <button id="retry-btn"  class="btn-retry">🔄 Opnieuw</button>
+        <button id="next-btn"   class="btn-next">Volgende →</button>
+      </div>
+
+    </div><!-- /feedback-area -->
+  </main>
+
+  <footer class="disclaimer-bar">
+    <button class="disc-btn" data-modal="data">ℹ️ Gegevensgebruik</button>
+    <button class="disc-btn" data-modal="auteur">✉️ Auteur</button>
+    <button class="disc-btn" data-modal="licentie">📄 Licentie</button>
+    <a class="disc-btn" href="https://github.com/geertvandeweyer/frans_uitspraak" target="_blank" rel="noopener">⌨️ GitHub</a>
+    <button class="disc-btn" data-modal="koffie">☕ Support</button>
+  </footer>
+
+</div><!-- /app-screen -->
+
+<!-- Modal overlay (shared by both screens) -->
+<div id="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div id="modal-box">
+    <div id="modal-header">
+      <h2 id="modal-title"></h2>
+      <button id="modal-close" aria-label="Sluiten">✕</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- Scripts: sentences first (defines window.CHAPTERS), then utilities, then app -->
+<script src="js/sentences.js"></script>
+<script src="js/align.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
