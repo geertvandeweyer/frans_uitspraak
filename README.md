@@ -2,7 +2,7 @@
 
 Een browser-only app om Franse uitspraak te oefenen. Lees een zin luidop voor; de app luistert via [OpenAI Whisper](https://github.com/openai/whisper) (draait volledig lokaal in de browser via [Transformers.js](https://github.com/xenova/transformers.js)) en geeft per woord kleurgecodeerde feedback plus een vloeiendheidsanalyse op basis van Whisper-tijdstempels.
 
-Zinnen worden ingeladen vanuit `js/sentences.js`, gegenereerd vanuit de *En action 5*-handboek-PDF's via het extractiescript in `scripts/`.
+Zinnen worden ingeladen vanuit `js/sentences.js`, gegenereerd vanuit de *En action 5*-handboek-PDF's via het extractiescript in `scripts/`. Extra zinnen werden op basis van de woordenschat in deze PDF's, na curatie, automatisch aangemaakt door chatGPT.  
 
 ---
 
@@ -82,7 +82,19 @@ De app detecteert de adapter en toont een waarschuwing als de gekozen GPU Intel 
 
 ### Controleer of WebGPU actief is
 
-Open `chrome://gpu` en zoek naar `WebGPU: Hardware accelerated`. Als het *Software only* toont, ontbreken de Vulkan-drivers.
+Open `chrome://gpu` en zoek naar `WebGPU: Hardware accelerated`. Als het *Software only* toont, ontbreken de Vulkan-drivers of wordt chrome niet correct gestart. Test via CLI als: 
+
+```bash
+
+google-chrome \
+  --ozone-platform=x11 \
+  --enable-features=Vulkan,VulkanFromANGLE,DefaultANGLEVulkan,UseSkiaRenderer \
+  --use-angle=vulkan \
+  --enable-unsafe-webgpu \
+  --ignore-gpu-blocklist \
+  "$@"
+
+```
 
 ---
 
