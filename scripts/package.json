@@ -1,0 +1,11 @@
+{
+  "name": "extract-sentences",
+  "version": "1.0.0",
+  "description": "Extract French sentences from PDF textbooks",
+  "scripts": {
+    "extract": "node extract_sentences.js"
+  },
+  "dependencies": {
+    "pdf-parse": "^1.1.1"
+  }
+}
